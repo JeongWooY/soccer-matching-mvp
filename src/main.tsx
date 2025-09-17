@@ -1,16 +1,14 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
-import './index.css'
-import App from './app/App'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider } from 'react-router-dom'
 import { router } from './app/routes/router'
-import { queryClient } from './lib/queryClient'
+import './index.css'
+import ToastProvider from './app/components/toast/ToastProvider'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ToastProvider>
+      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+    </ToastProvider>
+  </React.StrictMode>
 )

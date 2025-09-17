@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { updateReservationStatus } from '../api/updateReservationStatus';
-import type { Reservation } from '../api/getReservationsByPost';
+import { updateReservationStatus } from '../../features/match/api/updateReservationStatus';
+import type { Reservation } from '../../features/match/api/getReservationsByPost';
 
 export default function ReservationAdmin({ item, onUpdated }: {
   item: Reservation; onUpdated: () => void;

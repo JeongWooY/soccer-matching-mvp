@@ -1,30 +1,19 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'
+import type { Reservation } from '@/types/db'
 
-type ReserveInput = {
-  postId: string;
-  requesterTeamId?: string | null;
-  message?: string;
-};
-
-export async function reserveMatch({
-  postId,
-  requesterTeamId = null,
-  message = '예약 신청합니다!',
-}: ReserveInput): Promise<{ id: string }> {
-  if (!postId) throw new Error('postId가 필요합니다.');
+export async function reserveMatch(postId: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('로그인이 필요합니다.')
 
   const { data, error } = await supabase
-    .from('match_reservations')
+    .from('reservations')
     .insert({
       post_id: postId,
-      requester_team_id: requesterTeamId,
-      message,
+      requester_id: user.id, // RLS with check(requester_id = auth.uid())
+      status: 'requested'
     })
-    .select('id')          // ← 배열로 와도 OK
-    .limit(1)              // ← 첫 행만
-    .maybeSingle();        // ← 0/1행 안전 처리
-
-  if (error) throw error;
-  if (!data) throw new Error('예약 생성 결과가 비어 있습니다.');
-  return { id: data.id };
+    .select()
+    .single()
+  if (error) throw error
+  return data as Reservation
 }

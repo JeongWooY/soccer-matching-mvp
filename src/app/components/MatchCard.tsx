@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { MatchPost } from '../types'
+import type { MatchPost } from '../../features/match/types'
 
 export default function MatchCard({ post }: { post: MatchPost }) {
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getReservationsByPost, type Reservation } from '../api/getReservationsByPost';
+import { getReservationsByPost, type Reservation } from '../../features/match/api/getReservationsByPost';
 import ReservationAdmin from './ReservationAdmin';
 
 export default function ReservationList({ postId }: { postId: string }) {

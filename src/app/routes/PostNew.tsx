@@ -1,50 +1,86 @@
-import { useState } from 'react'
-import { createMatchPost } from '@/features/match/api/createMatchPost'
+import { FormEvent, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createMatchPost } from '../../features/match/api/createMatchPost'
+import AuthLayout from '../components/AuthLayout'
+import TextField from '../components/ui/TextField'
+import Button from '../components/ui/Button'
 
 export default function PostNew() {
-  const [form, setForm] = useState({
-    date: '', start: '', end: '', venue: '', city: '', level: '중', fee_split: '반반', openchat_url: ''
-  })
+  const nav = useNavigate()
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [location, setLocation] = useState('')
+  const [matchDate, setMatchDate] = useState<string>('') // datetime-local 값
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const onSubmit = async (e: React.FormEvent) => {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    setError(null)
+    setLoading(true)
     try {
-      await createMatchPost({
-        date: form.date,
-        start_time: form.start,
-        end_time: form.end,
-        venue: form.venue,
-        city: form.city || null,
-        level: form.level || null,
-        fee_split: form.fee_split || null,
-        openchat_url: form.openchat_url || null
+      const data = await createMatchPost({
+        title,
+        content,
+        location,
+        match_date: matchDate ? new Date(matchDate).toISOString() : null,
       })
-      alert('등록 완료!')
-      window.location.href = '/'
-    } catch (err:any) {
-      alert(err.message || '오류가 발생했습니다.')
+      nav(`/post/${data.id}`) // 작성 후 상세페이지로 이동
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 max-w-xl">
-      <div><div className="label">날짜</div><input className="input" placeholder="YYYY-MM-DD" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} /></div>
-      <div><div className="label">시작</div><input className="input" placeholder="19:00" value={form.start} onChange={e=>setForm({...form, start:e.target.value})} /></div>
-      <div><div className="label">종료</div><input className="input" placeholder="21:00" value={form.end} onChange={e=>setForm({...form, end:e.target.value})} /></div>
-      <div><div className="label">구장</div><input className="input" placeholder="○○체육공원" value={form.venue} onChange={e=>setForm({...form, venue:e.target.value})} /></div>
-      <div><div className="label">도시/구</div><input className="input" placeholder="서울 ○○구" value={form.city} onChange={e=>setForm({...form, city:e.target.value})} /></div>
-      <div><div className="label">레벨</div>
-        <select className="select" value={form.level} onChange={e=>setForm({...form, level:e.target.value})}>
-          <option>하</option><option>중</option><option>상</option>
-        </select>
-      </div>
-      <div><div className="label">분담</div>
-        <select className="select" value={form.fee_split} onChange={e=>setForm({...form, fee_split:e.target.value})}>
-          <option>반반</option><option>전액 부담</option><option>기타</option>
-        </select>
-      </div>
-      <div><div className="label">오픈채팅 링크</div><input className="input" placeholder="https://open.kakao.com/..." value={form.openchat_url} onChange={e=>setForm({...form, openchat_url:e.target.value})} /></div>
-      <button className="btn">등록</button>
-    </form>
+    <AuthLayout title="새 매치 작성" subtitle="팀원을 구하거나 매치를 열어보세요.">
+      <form onSubmit={onSubmit} className="grid gap-4">
+        <TextField
+          label="제목"
+          placeholder="예: 토요일 축구 상대 구해요"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          required
+        />
+
+        <TextField
+          label="장소"
+          placeholder="평촌 자유 공원"
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+        />
+
+        <label className="grid gap-1.5">
+          <span className="text-sm font-medium">날짜 및 시간</span>
+          <input
+            type="datetime-local"
+            className="h-11 rounded-xl px-4 bg-white/70 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={matchDate}
+            onChange={e => setMatchDate(e.target.value)}
+          />
+        </label>
+
+        <label className="grid gap-1.5">
+          <span className="text-sm font-medium">내용</span>
+          <textarea
+            className="min-h-[120px] rounded-xl px-4 py-3 bg-white/70 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            placeholder="추가 정보 (예: 참가비, 인원 제한 등)"
+            value={content}
+            onChange={e => setContent(e.target.value)}
+          />
+        </label>
+
+        {error && (
+          <div className="rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 text-sm px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" disabled={loading}>
+          {loading ? '작성 중…' : '작성하기'}
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }
