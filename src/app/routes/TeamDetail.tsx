@@ -1,5 +1,7 @@
+// src/app/routes/TeamDetail.tsx
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuth } from '../../features/auth/useAuth'
 import { useToast } from '../components/toast/ToastProvider'
 import { supabase } from '../../lib/supabase'
@@ -11,7 +13,9 @@ import { respondRequest } from '../../features/teams/respondRequest'
 import { listRequests } from '../../features/teams/listRequests'
 import { listInvitations } from '../../features/teams/listInvitations'
 import { sendInvitation } from '../../features/teams/sendInvitation'
-import type { ReactNode } from 'react'
+import { leaveTeam } from '@/features/teams/leaveTeam'
+import { kickMember } from '@/features/teams/kickMember'
+import { changeMemberRole } from '@/features/teams/changeMemberRole'
 
 export default function TeamDetail() {
   const { id } = useParams<{ id: string }>()
@@ -44,7 +48,6 @@ export default function TeamDetail() {
     ;(async () => {
       try {
         setLoading(true)
-        // 팀 정보
         const { data: t, error: te } = await supabase
           .from('teams')
           .select('*')
@@ -53,7 +56,6 @@ export default function TeamDetail() {
         if (te) throw te
         setTeam(t as Team)
 
-        // 멤버/요청/초대
         const [ms, rs, is] = await Promise.all([
           listTeamMembers(id),
           listRequests(id),
@@ -76,6 +78,18 @@ export default function TeamDetail() {
     return !!(t && uid && t.created_by === uid)
   }
 
+  async function refreshAll() {
+    if (!id) return
+    const [ms, rs, is] = await Promise.all([
+      listTeamMembers(id),
+      listRequests(id),
+      isOwner ? listInvitations(id) : Promise.resolve([]),
+    ])
+    setMembers(ms as TeamMember[])
+    setRequests(rs as TeamRequest[])
+    setInvites(is as TeamInvitation[])
+  }
+
   async function handleJoin() {
     if (!id || !user) { push('로그인이 필요합니다.'); return }
     try {
@@ -92,9 +106,7 @@ export default function TeamDetail() {
     try {
       await respondRequest(reqId, action)
       push(action === 'accepted' ? '요청을 수락했습니다.' : '요청을 거절했습니다.')
-      const [ms, rs] = await Promise.all([listTeamMembers(id!), listRequests(id!)])
-      setMembers(ms as TeamMember[])
-      setRequests(rs as TeamRequest[])
+      await refreshAll()
     } catch (e) {
       push(toMsg(e))
     }
@@ -107,6 +119,41 @@ export default function TeamDetail() {
       push('초대를 보냈습니다.')
       const is = await listInvitations(id)
       setInvites(is as TeamInvitation[])
+    } catch (e) {
+      push(toMsg(e))
+    }
+  }
+
+  async function onLeave() {
+    if (!id) return
+    if (!confirm('팀을 탈퇴할까요?')) return
+    try {
+      await leaveTeam(id)
+      push('팀을 탈퇴했습니다.')
+      await refreshAll()
+    } catch (e) {
+      push(toMsg(e))
+    }
+  }
+
+  async function onKick(memberId: string) {
+    if (!id) return
+    if (!confirm('해당 멤버를 추방할까요?')) return
+    try {
+      await kickMember(id, memberId)
+      push('멤버를 추방했습니다.')
+      await refreshAll()
+    } catch (e) {
+      push(toMsg(e))
+    }
+  }
+
+  async function onPromote(memberId: string, to: 'owner' | 'member') {
+    if (!id) return
+    try {
+      await changeMemberRole(id, memberId, to)
+      push('역할을 변경했습니다.')
+      await refreshAll()
     } catch (e) {
       push(toMsg(e))
     }
@@ -165,27 +212,56 @@ export default function TeamDetail() {
         </TabButton>
       </div>
 
-      {/* 내용 */}
+      {/* 멤버 */}
       {tab === 'members' && (
         <Card>
           {members.length === 0 ? (
             <EmptyRow text="아직 멤버가 없어요." />
           ) : (
             <ul className="grid gap-2">
-              {members.map(m => (
-                <li key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200/70 dark:border-slate-800 p-3">
-                  <div className="text-sm">
-                    <span className="font-medium">{m.user_id.slice(0, 8)}</span>
-                    <span className="text-slate-500 ml-2">{new Date(m.created_at).toLocaleString()}</span>
-                  </div>
-                  <Badge tone={m.role === 'owner' ? 'indigo' : 'slate'}>{m.role}</Badge>
-                </li>
-              ))}
+              {members.map(m => {
+                const amI = m.user_id === user?.id
+                const canKick = isOwner && !amI
+                const canPromote = isOwner && !amI && m.role === 'member'
+                const canDemote = isOwner && !amI && m.role === 'owner'
+                return (
+                  <li key={m.id} className="flex items-center justify-between rounded-xl border border-slate-200/70 dark:border-slate-800 p-3">
+                    <div className="text-sm">
+                      <span className="font-medium">{m.user_id.slice(0, 8)}</span>
+                      <span className="text-slate-500 ml-2">{new Date(m.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={m.role === 'owner' ? 'indigo' : 'slate'}>{m.role}</Badge>
+                      {amI && !isOwner && (
+                        <button onClick={onLeave} className="h-8 px-3 rounded-lg bg-slate-200/80 dark:bg-slate-800/60 text-xs">
+                          탈퇴
+                        </button>
+                      )}
+                      {canPromote && (
+                        <button onClick={() => onPromote(m.user_id, 'owner')} className="h-8 px-3 rounded-lg bg-slate-200/80 dark:bg-slate-800/60 text-xs">
+                          오너로 승격
+                        </button>
+                      )}
+                      {canDemote && (
+                        <button onClick={() => onPromote(m.user_id, 'member')} className="h-8 px-3 rounded-lg bg-slate-200/80 dark:bg-slate-800/60 text-xs">
+                          멤버로 내리기
+                        </button>
+                      )}
+                      {canKick && (
+                        <button onClick={() => onKick(m.user_id)} className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs">
+                          추방
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </Card>
       )}
 
+      {/* 요청 관리 */}
       {tab === 'requests' && (
         <Card>
           {!isOwner ? (
@@ -216,6 +292,7 @@ export default function TeamDetail() {
         </Card>
       )}
 
+      {/* 초대 */}
       {tab === 'invites' && (
         <Card>
           {!isOwner ? (
@@ -280,7 +357,6 @@ function Card({ children }: { children: ReactNode }){
   )
 }
 
-/* ✅ 누락돼서 에러났던 TabButton */
 function TabButton({
   active,
   onClick,
@@ -307,7 +383,6 @@ function TabButton({
   )
 }
 
-/* ✅ children 타입 명시 */
 type BadgeProps = { children: ReactNode; tone?: 'indigo' | 'slate' }
 function Badge({ children, tone = 'indigo' }: BadgeProps) {
   const cls =
@@ -327,7 +402,6 @@ function Chip({ children, icon }: ChipProps) {
   )
 }
 
-/* ✅ 초대 폼 */
 function InviteForm({ onInvite }: { onInvite: (email: string) => void }) {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -358,4 +432,3 @@ function InviteForm({ onInvite }: { onInvite: (email: string) => void }) {
     </form>
   )
 }
-
