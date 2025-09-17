@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getMatchPostById } from '@/features/match/api/getMatchPostById'
 import { reserveMatch } from '@/features/match/api/reserveMatch'
+import ReservationList from '@/features/match/components/ReservationList'
 
 export default function PostDetail() {
   const { id } = useParams()
   const [post, setPost] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -17,15 +19,16 @@ export default function PostDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
-  const onReserve = async () => {
-    try {
-      const defaultTeamId = import.meta.env.VITE_DEFAULT_TEAM_ID as string | undefined
-      await reserveMatch(id!, defaultTeamId ?? null as any, '예약 신청합니다!')
-      alert('예약 신청 완료!')
-    } catch (e:any) {
-      alert(e.message ?? '예약 실패')
-    }
+const onReserve = async () => {
+  try {
+    const defaultTeamId = import.meta.env.VITE_DEFAULT_TEAM_ID?.trim() || null;
+    await reserveMatch({ postId: id!, requesterTeamId: defaultTeamId, message: '예약 신청합니다!' });
+    alert('예약 신청 완료!');
+    setRefreshKey(k => k + 1); // 목록 새로고침
+  } catch (e: any) {
+    alert(e.message ?? '예약 실패');
   }
+};
 
   if (loading) return <div>로딩 중…</div>
   if (error || !post) return <div className="card">불러오기 실패: {error}</div>

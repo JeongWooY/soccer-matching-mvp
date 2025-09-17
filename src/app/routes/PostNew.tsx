@@ -35,7 +35,7 @@ export default function PostNew() {
       <div><div className="label">도시/구</div><input className="input" placeholder="서울 ○○구" value={form.city} onChange={e=>setForm({...form, city:e.target.value})} /></div>
       <div><div className="label">레벨</div>
         <select className="select" value={form.level} onChange={e=>setForm({...form, level:e.target.value})}>
-          <option>초</option><option>중</option><option>상</option>
+          <option>하</option><option>중</option><option>상</option>
         </select>
       </div>
       <div><div className="label">분담</div>
