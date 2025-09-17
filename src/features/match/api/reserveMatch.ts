@@ -1,9 +1,9 @@
 import { supabase } from '@/lib/supabase';
 
 type ReserveInput = {
-  postId: string;                 // 예약할 게시글 id
-  requesterTeamId?: string | null; // 신청자 팀 id (없으면 null 허용: 임시 테스트용)
-  message?: string;               // 신청 메세지
+  postId: string;
+  requesterTeamId?: string | null;
+  message?: string;
 };
 
 export async function reserveMatch({
@@ -19,11 +19,12 @@ export async function reserveMatch({
       post_id: postId,
       requester_team_id: requesterTeamId,
       message,
-      // status 기본값은 DB에서 'requested'
     })
-    .select('id') // 방금 생성된 레코드 id만 반환
-    .single();
+    .select('id')          // ← 배열로 와도 OK
+    .limit(1)              // ← 첫 행만
+    .maybeSingle();        // ← 0/1행 안전 처리
 
   if (error) throw error;
-  return { id: data!.id };
+  if (!data) throw new Error('예약 생성 결과가 비어 있습니다.');
+  return { id: data.id };
 }
