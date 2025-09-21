@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { useToast } from '../components/toast/ToastProvider'
 import { respondInvite } from '../../features/teams/respondInvite'
-import { listMyInvites } from '@/features/teams/listMyInvites'
+import { supabase } from '../../lib/supabase'
 
 type Row = {
   id: string
@@ -11,7 +11,7 @@ type Row = {
   invited_email: string
   status: 'pending' | 'accepted' | 'rejected' | 'expired'
   created_at: string
-  team?: { id: string; name: string | null } | null
+  team: { id: string; name: string | null } | null
 }
 
 export default function MyInvites() {
@@ -21,37 +21,41 @@ export default function MyInvites() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  function toMsg(e: unknown) {
-    if (e instanceof Error) return e.message
-    if (typeof e === 'string') return e
-    try { return JSON.stringify(e) } catch { return '알 수 없는 오류' }
-  }
+  const toMsg = (e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : '알 수 없는 오류'
 
   useEffect(() => {
-  if (!user?.email) { setLoading(false); return }
-  ;(async () => {
-    try {
-      setLoading(true)
-      const email = user.email as string   // ✅ 가드 후 단언
-      const result = await listMyInvites(email)
-      setRows(result as Row[])
-      setError(null)
-    } catch (e) {
-      setError(toMsg(e))
-    } finally {
-      setLoading(false)
-    }
-  })()
-}, [user?.email])
+    if (!user?.email) { setLoading(false); return }
+    ;(async () => {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('team_invitations')
+          .select('id,team_id,invited_email,status,created_at, team:teams(id,name)')
+          .eq('invited_email', user.email)
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        const normalized: Row[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          team_id: r.team_id,
+          invited_email: r.invited_email,
+          status: r.status,
+          created_at: r.created_at,
+          team: Array.isArray(r.team) ? (r.team[0] ?? null) : (r.team ?? null),
+        }))
+        setRows(normalized)
+        setError(null)
+      } catch (e) { setError(toMsg(e)) }
+      finally { setLoading(false) }
+    })()
+  }, [user?.email])
 
   async function onRespond(id: string, act: 'accepted' | 'rejected') {
     try {
       await respondInvite(id, act)
       push(act === 'accepted' ? '초대를 수락했습니다.' : '초대를 거절했습니다.')
       setRows(prev => prev.map(r => (r.id === id ? { ...r, status: act } : r)))
-    } catch (e) {
-      push(toMsg(e))
-    }
+    } catch (e) { push(toMsg(e)) }
   }
 
   if (!user) return <GuardCard />
@@ -60,15 +64,9 @@ export default function MyInvites() {
 
   return (
     <div className="grid gap-6">
-      <HeaderCard title="내 초대">
-        이메일({user.email})로 받은 팀 초대를 확인하고 수락/거절할 수 있어요.
-      </HeaderCard>
-
+      <HeaderCard title="내 초대">내 이메일({user.email})로 온 팀 초대를 확인해요.</HeaderCard>
       {rows.length === 0 ? (
-        <EmptyCard
-          title="받은 초대가 없습니다."
-          action={<LinkBtn to="/team">팀 탐색하기</LinkBtn>}
-        />
+        <EmptyCard title="받은 초대가 없습니다." action={<LinkBtn to="/team">팀 탐색하기</LinkBtn>} />
       ) : (
         <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 p-4">
           <ul className="grid gap-2">
@@ -98,7 +96,7 @@ export default function MyInvites() {
   )
 }
 
-/* UI helpers */
+/* UI helpers (간단) */
 function HeaderCard({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="relative">

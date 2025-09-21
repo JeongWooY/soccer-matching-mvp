@@ -1,69 +1,49 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
-import { useToast } from '../components/toast/ToastProvider'
 import { supabase } from '../../lib/supabase'
-import { cancelTeamRequest } from '../../features/teams/cancelRequest'
 
 type Row = {
   id: string
   team_id: string
   status: 'pending' | 'accepted' | 'rejected'
   created_at: string
-  team?: { id: string; name: string | null } | null  // ✅ 단일 객체로 변경
+  team: { id: string; name: string | null } | null
 }
 
 export default function MyTeamRequests() {
   const { user } = useAuth()
-  const { push } = useToast()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  function toMsg(e: unknown) {
-    if (e instanceof Error) return e.message
-    if (typeof e === 'string') return e
-    try { return JSON.stringify(e) } catch { return '알 수 없는 오류' }
-  }
+  const toMsg = (e: unknown) =>
+    e instanceof Error ? e.message : typeof e === 'string' ? e : '알 수 없는 오류'
 
- useEffect(() => {
-  if (!user?.id) { setLoading(false); return }
-  ;(async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('team_requests')
-        .select('id, team_id, status, created_at, team:teams(id, name)')
-        .eq('requester_id', user.id)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-
-      // 🔧 team이 배열로 올 수도 있으므로 첫 원소를 꺼내 단일 객체로 정규화
-      const normalized = (data ?? []).map((r: any) => ({
-        ...r,
-        team: Array.isArray(r.team) ? (r.team[0] ?? null) : (r.team ?? null),
-      }))
-
-      // 타입 단언 전에 unknown 거쳐서 TS2352 경고 방지
-      setRows(normalized as unknown as Row[])
-      setError(null)
-    } catch (e) {
-      setError(toMsg(e))
-    } finally {
-      setLoading(false)
-    }
-  })()
-}, [user?.id])
-
-  async function handleCancel(id: string) {
-    try {
-      await cancelTeamRequest(id)
-      push('요청을 취소했습니다.')
-      setRows(prev => prev.filter(r => r.id !== id))
-    } catch (e) {
-      push(toMsg(e))
-    }
-  }
+  useEffect(() => {
+    if (!user?.id) { setLoading(false); return }
+    ;(async () => {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('team_requests')
+          .select('id,team_id,status,created_at, team:teams(id,name)')
+          .eq('requester_id', user.id)
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        const normalized: Row[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          team_id: r.team_id,
+          status: r.status,
+          created_at: r.created_at,
+          team: Array.isArray(r.team) ? (r.team[0] ?? null) : (r.team ?? null),
+        }))
+        setRows(normalized)
+        setError(null)
+      } catch (e) { setError(toMsg(e)) }
+      finally { setLoading(false) }
+    })()
+  }, [user?.id])
 
   if (!user) return <GuardCard />
   if (loading) return <Skeleton />
@@ -71,10 +51,7 @@ export default function MyTeamRequests() {
 
   return (
     <div className="grid gap-6">
-      <HeaderCard title="내 팀 참여 요청">
-        내가 보낸 참여 요청의 상태를 확인하고, 대기 중인 요청은 취소할 수 있어요.
-      </HeaderCard>
-
+      <HeaderCard title="내 참여 요청">내가 팀에 보낸 가입 요청 목록이에요.</HeaderCard>
       {rows.length === 0 ? (
         <EmptyCard title="보낸 요청이 없습니다." action={<LinkBtn to="/team">팀 탐색하기</LinkBtn>} />
       ) : (
@@ -84,23 +61,11 @@ export default function MyTeamRequests() {
               <li key={r.id} className="flex items-center justify-between rounded-xl border border-slate-200/70 dark:border-slate-800 p-3">
                 <div className="text-sm">
                   <Link to={`/team/${r.team_id}`} className="font-medium underline underline-offset-2">
-                    {r.team?.name ?? r.team_id.slice(0, 8)} {/* ✅ r.team 사용 */}
+                    {r.team?.name ?? r.team_id.slice(0, 8)}
                   </Link>
                   <span className="ml-2">{r.status}</span>
                   <span className="text-slate-500 ml-2">{new Date(r.created_at).toLocaleString()}</span>
                 </div>
-                {r.status === 'pending' ? (
-                  <button
-                    onClick={() => handleCancel(r.id)}
-                    className="h-9 px-3 rounded-lg bg-slate-200/80 dark:bg-slate-800/60 text-sm"
-                  >
-                    취소
-                  </button>
-                ) : (
-                  <span className="text-xs px-2 py-0.5 rounded-full ring-1 ring-slate-300 dark:ring-slate-700">
-                    완료
-                  </span>
-                )}
               </li>
             ))}
           </ul>

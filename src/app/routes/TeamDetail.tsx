@@ -48,18 +48,14 @@ export default function TeamDetail() {
     ;(async () => {
       try {
         setLoading(true)
-        const { data: t, error: te } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', id)
-          .single()
+        const { data: t, error: te } = await supabase.from('teams').select('*').eq('id', id).single()
         if (te) throw te
         setTeam(t as Team)
 
         const [ms, rs, is] = await Promise.all([
           listTeamMembers(id),
           listRequests(id),
-          isOwnerGuess(t as Team, user?.id) ? listInvitations(id) : Promise.resolve([]),
+          (t as Team).created_by === user?.id ? listInvitations(id) : Promise.resolve([]),
         ])
         setMembers(ms as TeamMember[])
         setRequests(rs as TeamRequest[])
@@ -71,12 +67,7 @@ export default function TeamDetail() {
         setLoading(false)
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user?.id])
-
-  function isOwnerGuess(t: Team, uid?: string | null) {
-    return !!(t && uid && t.created_by === uid)
-  }
 
   async function refreshAll() {
     if (!id) return
@@ -97,9 +88,7 @@ export default function TeamDetail() {
       push('참여 요청을 보냈습니다.')
       const rs = await listRequests(id)
       setRequests(rs as TeamRequest[])
-    } catch (e) {
-      push(toMsg(e))
-    }
+    } catch (e) { push(toMsg(e)) }
   }
 
   async function handleRespond(reqId: string, action: 'accepted' | 'rejected') {
@@ -107,9 +96,7 @@ export default function TeamDetail() {
       await respondRequest(reqId, action)
       push(action === 'accepted' ? '요청을 수락했습니다.' : '요청을 거절했습니다.')
       await refreshAll()
-    } catch (e) {
-      push(toMsg(e))
-    }
+    } catch (e) { push(toMsg(e)) }
   }
 
   async function handleInvite(email: string) {
@@ -119,44 +106,26 @@ export default function TeamDetail() {
       push('초대를 보냈습니다.')
       const is = await listInvitations(id)
       setInvites(is as TeamInvitation[])
-    } catch (e) {
-      push(toMsg(e))
-    }
+    } catch (e) { push(toMsg(e)) }
   }
 
+  // 🔽 역할 변경/추방/탈퇴 — 버튼에 연결됨
   async function onLeave() {
     if (!id) return
     if (!confirm('팀을 탈퇴할까요?')) return
-    try {
-      await leaveTeam(id)
-      push('팀을 탈퇴했습니다.')
-      await refreshAll()
-    } catch (e) {
-      push(toMsg(e))
-    }
+    try { await leaveTeam(id); push('팀을 탈퇴했습니다.'); await refreshAll() }
+    catch (e) { push(toMsg(e)) }
   }
-
   async function onKick(memberId: string) {
     if (!id) return
     if (!confirm('해당 멤버를 추방할까요?')) return
-    try {
-      await kickMember(id, memberId)
-      push('멤버를 추방했습니다.')
-      await refreshAll()
-    } catch (e) {
-      push(toMsg(e))
-    }
+    try { await kickMember(id, memberId); push('멤버를 추방했습니다.'); await refreshAll() }
+    catch (e) { push(toMsg(e)) }
   }
-
-  async function onPromote(memberId: string, to: 'owner' | 'member') {
+  async function onPromote(memberId: string, to: 'owner'|'member') {
     if (!id) return
-    try {
-      await changeMemberRole(id, memberId, to)
-      push('역할을 변경했습니다.')
-      await refreshAll()
-    } catch (e) {
-      push(toMsg(e))
-    }
+    try { await changeMemberRole(id, memberId, to); push('역할을 변경했습니다.'); await refreshAll() }
+    catch (e) { push(toMsg(e)) }
   }
 
   if (loading) return <PageSkeleton />
@@ -182,8 +151,6 @@ export default function TeamDetail() {
               {isOwner && <Badge tone="indigo">내가 만든 팀</Badge>}
             </div>
             {team.bio && <p className="text-slate-700 dark:text-slate-300">{team.bio}</p>}
-
-            {/* 참여 버튼 (오너X, 멤버X) */}
             {!isOwner && !isMember && user && (
               <div className="pt-1">
                 {myPendingRequest ? (
@@ -409,13 +376,8 @@ function InviteForm({ onInvite }: { onInvite: (email: string) => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim()) return
-    try {
-      setBusy(true)
-      await onInvite(email.trim())
-      setEmail('')
-    } finally {
-      setBusy(false)
-    }
+    try { setBusy(true); await onInvite(email.trim()); setEmail('') }
+    finally { setBusy(false) }
   }
 
   return (

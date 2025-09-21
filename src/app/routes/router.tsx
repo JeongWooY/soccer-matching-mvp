@@ -12,7 +12,8 @@ import Me from './Me'
 import Login from './Login'
 import Signup from './Signup'
 import TeamDetail from './TeamDetail'
-
+import MyInvites from './MyInvites'
+import MyTeamRequests from './MyTeamRequests'
 // '@' 별칭을 안 쓴다면 상대경로로
 import RequireAuth from '../../features/auth/RequireAuth'
 
@@ -29,6 +30,8 @@ export const router = createBrowserRouter([
       { path: 'post/new', element: <RequireAuth><PostNew /></RequireAuth> },
       { path: 'login', element: <Login /> },
       { path: 'signup', element: <Signup /> },
+      { path: 'team/invites', element: <RequireAuth><MyInvites /></RequireAuth> },   // ✅ 추가
+      { path: 'team/requests', element: <RequireAuth><MyTeamRequests /></RequireAuth> },
     ],
   },
 ])

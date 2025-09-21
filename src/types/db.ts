@@ -21,3 +21,19 @@ export type Reservation = {
   status: 'requested' | 'accepted' | 'rejected' | 'canceled'
   created_at: string
 }
+
+export type Comment = {
+  id: string
+  post_id: string
+  author_id: string | null
+  content: string
+  created_at: string
+}
+
+export type CommentReaction = {
+  id: string
+  comment_id: string
+  user_id: string
+  emoji: string
+  created_at: string
+}
